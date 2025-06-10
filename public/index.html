@@ -1,22 +1,22 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shortlink Anda</title>
+    <title>Shortlink Creator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Buat Shortlink Baru</h1>
+        <h1>Buat Shortlink Anda</h1>
         <input type="url" id="longUrlInput" placeholder="Masukkan URL panjang di sini..." required>
-        <button id="shortenButton">Persingkat URL</button>
+        <button id="createLinkBtn">Buat Shortlink</button>
         <div id="result" class="hidden">
             <p>Shortlink Anda:</p>
-            <a id="shortUrlOutput" href="#" target="_blank"></a>
-            <button id="copyButton">Salin</button>
+            <a id="shortLinkOutput" href="#" target="_blank"></a>
+            <button id="copyBtn">Salin</button>
         </div>
-        <p id="errorMessage" class="error hidden"></p>
+        <p id="message" class="hidden"></p>
     </div>
 
     <script src="script.js"></script>
