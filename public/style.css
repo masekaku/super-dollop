@@ -1,0 +1,92 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f2f5;
+    margin: 0;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 25px;
+}
+
+input[type="url"] {
+    width: calc(100% - 20px);
+    padding: 12px 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+#result {
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #e9f7ef;
+    border: 1px solid #d4edda;
+    border-radius: 5px;
+}
+
+#result p {
+    margin-top: 0;
+    color: #28a745;
+}
+
+#shortUrlOutput {
+    display: block;
+    word-break: break-all;
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+#shortUrlOutput:hover {
+    text-decoration: underline;
+}
+
+#copyButton {
+    background-color: #6c757d;
+}
+
+#copyButton:hover {
+    background-color: #5a6268;
+}
+
+.error {
+    color: #dc3545;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}
