@@ -1,24 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+// Cloudflare Pages Functions akan menyediakan `context`
+// Variabel lingkungan diakses melalui `context.env`
+// Untuk ini, Anda perlu mengubah export default async (req, res) => { ... }
+// menjadi export const onRequest = async (context) => { ... }
+// dan mengambil req, res dari context
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
+// Fungsi utilitas untuk menghasilkan short code
 function generateShortCode() {
-    // Generates a random 6-character alphanumeric string
     return Math.random().toString(36).substring(2, 8);
 }
 
-export default async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
+export const onRequest = async (context) => {
+    const { request, env } = context; // Ambil request dan env dari context
+
+    const supabaseUrl = env.SUPABASE_URL;
+    const supabaseKey = env.SUPABASE_ANON_KEY;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    if (request.method !== 'POST') {
+        return new Response(JSON.stringify({ message: 'Method Not Allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
     }
 
-    const { longUrl } = req.body;
+    let longUrl;
+    try {
+        const requestBody = await request.json();
+        longUrl = requestBody.longUrl;
+    } catch (e) {
+        return new Response(JSON.stringify({ message: 'Invalid JSON body' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
 
     if (!longUrl) {
-        return res.status(400).json({ message: 'Long URL is required' });
+        return new Response(JSON.stringify({ message: 'Long URL is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     let shortCode;
@@ -26,17 +39,16 @@ export default async (req, res) => {
     let attempts = 0;
     const MAX_ATTEMPTS = 10;
 
-    // Loop to ensure the generated short_code is unique
     while (!isUnique && attempts < MAX_ATTEMPTS) {
         shortCode = generateShortCode();
         const { data, error } = await supabase
-            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI DI SINI
+            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI
             .select('id')
             .eq('short_code', shortCode);
 
         if (error) {
             console.error('Error checking short code uniqueness:', error.message);
-            return res.status(500).json({ message: 'Internal Server Error during uniqueness check' });
+            return new Response(JSON.stringify({ message: 'Internal Server Error during uniqueness check' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
         }
 
         if (data && data.length === 0) {
@@ -46,26 +58,27 @@ export default async (req, res) => {
     }
 
     if (!isUnique) {
-        return res.status(500).json({ message: 'Failed to generate unique short code after multiple attempts. Please try again.' });
+        return new Response(JSON.stringify({ message: 'Failed to generate unique short code. Please try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     try {
         const { data, error } = await supabase
-            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI DI SINI
+            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI
             .insert([{ short_code: shortCode, long_url: longUrl }])
-            .select(); // Returns the inserted data
+            .select();
 
         if (error) {
             console.error('Error inserting shortlink:', error.message);
-            return res.status(500).json({ message: 'Internal Server Error while creating shortlink' });
+            return new Response(JSON.stringify({ message: 'Internal Server Error while creating shortlink' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
         }
 
-        // The host header will be the domain where your serverless function is deployed (e.g., your-app.vercel.app)
-        const fullShortUrl = `${req.headers.host}/${shortCode}`;
+        // Dapatkan host dari request untuk membuat URL penuh
+        const fullShortUrl = `${request.headers.get('host')}/${shortCode}`;
 
-        res.status(200).json({ shortUrl: fullShortUrl });
+        return new Response(JSON.stringify({ shortUrl: fullShortUrl }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
     } catch (err) {
         console.error('Unhandled error in create-link:', err);
-        res.status(500).json({ message: 'An unexpected error occurred.' });
+        return new Response(JSON.stringify({ message: 'An unexpected error occurred.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 };
