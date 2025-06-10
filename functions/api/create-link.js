@@ -1,97 +1,71 @@
-// functions/api/create-link.js
 import { createClient } from '@supabase/supabase-js';
-import { nanoid } from 'nanoid';
 
-// Ambil variabel lingkungan dari Cloudflare Pages
-// Ini akan diset di pengaturan Pages Anda
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
-export async function onRequestPost({ request }) {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        return new Response(JSON.stringify({ error: 'Supabase credentials are not set.' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+function generateShortCode() {
+    // Generates a random 6-character alphanumeric string
+    return Math.random().toString(36).substring(2, 8);
+}
+
+export default async (req, res) => {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { longUrl } = req.body;
 
-    try {
-        const { longUrl } = await request.json();
+    if (!longUrl) {
+        return res.status(400).json({ message: 'Long URL is required' });
+    }
 
-        if (!longUrl || typeof longUrl !== 'string') {
-            return new Response(JSON.stringify({ error: 'Invalid URL provided.' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
+    let shortCode;
+    let isUnique = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10;
 
-        // Basic URL validation to ensure it's a valid URL string
-        try {
-            new URL(longUrl);
-        } catch (e) {
-            return new Response(JSON.stringify({ error: 'URL format is invalid. Make sure it starts with http:// or https://' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-
-        let shortCode;
-        let isUnique = false;
-        let attempts = 0;
-        const MAX_ATTEMPTS = 5;
-
-        // Generate a unique short code
-        while (!isUnique && attempts < MAX_ATTEMPTS) {
-            shortCode = nanoid(7); // Generate a 7-character short code
-            const { data, error } = await supabase
-                .from('short_links')
-                .select('short_code')
-                .eq('short_code', shortCode)
-                .single();
-
-            if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found" - which is good!
-                console.error('Supabase query error:', error);
-                throw new Error('Database query failed.');
-            }
-            if (!data) { // If no data found, shortCode is unique
-                isUnique = true;
-            }
-            attempts++;
-        }
-
-        if (!isUnique) {
-            return new Response(JSON.stringify({ error: 'Could not generate a unique short code after several attempts. Please try again.' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-
-        // Insert into Supabase
+    // Loop to ensure the generated short_code is unique
+    while (!isUnique && attempts < MAX_ATTEMPTS) {
+        shortCode = generateShortCode();
         const { data, error } = await supabase
-            .from('short_links')
-            .insert([{ short_code: shortCode, long_url: longUrl }])
-            .select(); // Use .select() to return the inserted data
+            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI DI SINI
+            .select('id')
+            .eq('short_code', shortCode);
 
         if (error) {
-            console.error('Supabase insert error:', error);
-            return new Response(JSON.stringify({ error: 'Failed to save shortlink.' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
+            console.error('Error checking short code uniqueness:', error.message);
+            return res.status(500).json({ message: 'Internal Server Error during uniqueness check' });
         }
 
-        return new Response(JSON.stringify({ shortCode }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        });
-
-    } catch (e) {
-        console.error('Error in create-link.js:', e);
-        return new Response(JSON.stringify({ error: e.message || 'Internal server error.' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        if (data && data.length === 0) {
+            isUnique = true;
+        }
+        attempts++;
     }
-}
+
+    if (!isUnique) {
+        return res.status(500).json({ message: 'Failed to generate unique short code after multiple attempts. Please try again.' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI DI SINI
+            .insert([{ short_code: shortCode, long_url: longUrl }])
+            .select(); // Returns the inserted data
+
+        if (error) {
+            console.error('Error inserting shortlink:', error.message);
+            return res.status(500).json({ message: 'Internal Server Error while creating shortlink' });
+        }
+
+        // The host header will be the domain where your serverless function is deployed (e.g., your-app.vercel.app)
+        const fullShortUrl = `${req.headers.host}/${shortCode}`;
+
+        res.status(200).json({ shortUrl: fullShortUrl });
+    } catch (err) {
+        console.error('Unhandled error in create-link:', err);
+        res.status(500).json({ message: 'An unexpected error occurred.' });
+    }
+};
