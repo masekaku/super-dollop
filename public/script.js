@@ -1,87 +1,80 @@
 document.addEventListener('DOMContentLoaded', () => {
     const longUrlInput = document.getElementById('longUrlInput');
-    const shortenButton = document.getElementById('shortenButton');
+    const createLinkBtn = document.getElementById('createLinkBtn');
     const resultDiv = document.getElementById('result');
-    const shortUrlOutput = document.getElementById('shortUrlOutput');
-    const copyButton = document.getElementById('copyButton');
-    const errorMessage = document.getElementById('errorMessage');
+    const shortLinkOutput = document.getElementById('shortLinkOutput');
+    const copyBtn = document.getElementById('copyBtn');
+    const messageDiv = document.getElementById('message');
 
-    shortenButton.addEventListener('click', async () => {
+    function showMessage(text, type = 'info') {
+        messageDiv.textContent = text;
+        messageDiv.className = `message ${type}`;
+        messageDiv.style.display = 'block';
+        setTimeout(() => {
+            messageDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    createLinkBtn.addEventListener('click', async () => {
         const longUrl = longUrlInput.value.trim();
+
         if (!longUrl) {
-            showError('URL panjang tidak boleh kosong.');
+            showMessage('Mohon masukkan URL yang valid.', 'error');
             return;
         }
 
-        // Basic URL validation
         try {
-            new URL(longUrl);
+            new URL(longUrl); // Simple URL validation
         } catch (e) {
-            showError('Format URL tidak valid. Pastikan diawali dengan http:// atau https://');
+            showMessage('URL yang dimasukkan tidak valid.', 'error');
             return;
         }
 
-        hideError();
-        shortenButton.disabled = true;
-        shortenButton.textContent = 'Memproses...';
+        showMessage('Membuat shortlink...', 'info');
+        createLinkBtn.disabled = true;
 
         try {
-            // Panggil Cloudflare Function Anda
-            // Perhatikan bahwa ini akan dipanggil di path /api/create-link
+            // Adjust the endpoint path if your deployment platform changes it
             const response = await fetch('/api/create-link', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ longUrl: longUrl })
+                body: JSON.stringify({ longUrl }),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                const shortCode = data.shortCode;
-                // Asumsikan base URL shortlink adalah domain Anda sendiri
-                // Cloudflare Pages akan mengalihkan permintaan ke fungsi Anda
-                const currentDomain = window.location.origin;
-                const fullShortUrl = `${currentDomain}/${shortCode}`; // URL pendek yang akan ditampilkan
-
-                shortUrlOutput.href = fullShortUrl;
-                shortUrlOutput.textContent = fullShortUrl;
+                // Ensure the displayed URL includes the full protocol and domain
+                const fullShortUrl = `https://${data.shortUrl}`;
+                shortLinkOutput.href = fullShortUrl;
+                shortLinkOutput.textContent = fullShortUrl;
                 resultDiv.classList.remove('hidden');
+                showMessage('Shortlink berhasil dibuat!', 'success');
+                longUrlInput.value = ''; // Clear input after successful creation
             } else {
-                showError(data.error || 'Terjadi kesalahan saat mempersingkat URL.');
+                showMessage(`Gagal membuat shortlink: ${data.message || 'Terjadi kesalahan.'}`, 'error');
+                resultDiv.classList.add('hidden');
             }
         } catch (error) {
-            console.error('Fetch error:', error);
-            showError('Terjadi kesalahan jaringan atau server.');
+            console.error('Error:', error);
+            showMessage('Terjadi kesalahan jaringan atau server. Coba lagi nanti.', 'error');
+            resultDiv.classList.add('hidden');
         } finally {
-            shortenButton.disabled = false;
-            shortenButton.textContent = 'Persingkat URL';
+            createLinkBtn.disabled = false;
         }
     });
 
-    copyButton.addEventListener('click', () => {
-        const textToCopy = shortUrlOutput.textContent;
+    copyBtn.addEventListener('click', () => {
+        const textToCopy = shortLinkOutput.textContent;
         navigator.clipboard.writeText(textToCopy)
             .then(() => {
-                copyButton.textContent = 'Tersalin!';
-                setTimeout(() => {
-                    copyButton.textContent = 'Salin';
-                }, 2000);
+                showMessage('Shortlink berhasil disalin!', 'success');
             })
             .catch(err => {
-                console.error('Gagal menyalin: ', err);
-                alert('Gagal menyalin URL.');
+                console.error('Gagal menyalin:', err);
+                showMessage('Gagal menyalin shortlink.', 'error');
             });
     });
-
-    function showError(message) {
-        errorMessage.textContent = message;
-        errorMessage.classList.remove('hidden');
-        resultDiv.classList.add('hidden'); // Sembunyikan hasil jika ada error
-    }
-
-    function hideError() {
-        errorMessage.classList.add('hidden');
-    }
 });
