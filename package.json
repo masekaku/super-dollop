@@ -1,0 +1,22 @@
+{
+  "name": "shortlink-app",
+  "version": "1.0.0",
+  "description": "A URL shortener using Cloudflare Pages, Functions, and Supabase.",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm run build && wrangler pages dev public --compatibility-date=2024-05-14 --local",
+    "build": "echo 'No build step required for static files, but you can add frontend build tools here if needed'",
+    "deploy": "npx wrangler pages deploy"
+  },
+  "keywords": ["shortlink", "cloudflare", "supabase", "serverless"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.4",
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "wrangler": "^3.57.2"
+  }
+}
+
