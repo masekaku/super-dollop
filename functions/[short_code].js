@@ -1,54 +1,56 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+export const onRequest = async (context) => {
+    const { request, env, params, waitUntil } = context; // Ambil request, env, params, dan waitUntil dari context
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = env.SUPABASE_URL;
+    const supabaseKey = env.SUPABASE_ANON_KEY;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default async (req, res) => {
-    // In Vercel/Netlify functions, dynamic segments are usually accessed via req.query
-    const shortCode = req.query.short_code;
+    const shortCode = params.short_code; // Cloudflare Pages Functions menyediakan dynamic path segments di context.params
 
     if (!shortCode) {
-        return res.status(400).send('Short code not provided.');
+        return new Response('Short code not provided.', { status: 400 });
     }
 
     try {
         const { data, error } = await supabase
-            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI DI SINI
+            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI
             .select('long_url, click_count')
             .eq('short_code', shortCode)
             .single();
 
-        if (error && error.code === 'PGRST116') { // Supabase code for "Row not found"
-            return res.status(404).send('Short URL not found.');
+        if (error && error.code === 'PGRST116') {
+            return new Response('Short URL not found.', { status: 404 });
         } else if (error) {
             console.error('Error fetching shortlink:', error.message);
-            return res.status(500).send('Internal Server Error.');
+            return new Response('Internal Server Error.', { status: 500 });
         }
 
         if (!data || !data.long_url) {
-            return res.status(404).send('Short URL not found or invalid.');
+            return new Response('Short URL not found or invalid.', { status: 404 });
         }
 
         const { long_url, click_count } = data;
 
-        // Asynchronously update click_count without delaying the redirect
-        supabase
-            .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI DI SINI
-            .update({ click_count: (click_count || 0) + 1 })
-            .eq('short_code', shortCode)
-            .then(({ error: updateError }) => {
-                if (updateError) {
-                    console.error('Error updating click count:', updateError.message);
-                }
-            });
+        // Update click_count asynchronously using waitUntil
+        waitUntil(
+            supabase
+                .from('shortlinks') // <<< PASTIKAN NAMA TABEL ANDA SESUAI
+                .update({ click_count: (click_count || 0) + 1 })
+                .eq('short_code', shortCode)
+                .then(({ error: updateError }) => {
+                    if (updateError) {
+                        console.error('Error updating click count:', updateError.message);
+                    }
+                })
+        );
 
-        // Perform the redirect
-        res.setHeader('Location', long_url);
-        return res.status(302).send(null); // 302 Found for temporary redirect
+        // Redirect
+        return Response.redirect(long_url, 302);
+
     } catch (err) {
         console.error('Unhandled error in shortcode redirect:', err);
-        res.status(500).send('An unexpected error occurred during redirection.');
+        return new Response('An unexpected error occurred during redirection.', { status: 500 });
     }
 };
